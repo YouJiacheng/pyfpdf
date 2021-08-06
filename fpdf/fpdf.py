@@ -2067,3 +2067,63 @@ class FPDF(object):
                     self.rect(x, y, dim[d], h, 'F')
                 x += dim[d]
             x += dim['n']
+
+# still use str concat within each page
+class FPDF_fixed1(FPDF):
+    def __init__(self, orientation='P', unit='mm', format='A4'):
+        super().__init__(orientation=orientation, unit=unit, format=format)
+        self.buffer = bytearray()
+
+    def _out(self, s):
+        if(self.state == 2):
+            # still use str concat within each page
+            if isinstance(s, bytes):
+                s = s.decode('latin1')
+            elif not isinstance(s, str):
+                s = str(s)
+            self.pages[self.page] += s + '\n'
+        else:
+            if not isinstance(s, bytes):
+                if not isinstance(s, str):
+                    s = str(s)
+                s = s.encode('latin1')
+            self.buffer += s + b'\n'
+
+    def output(self, name=''):
+        if(self.state < 3):
+            self.close()
+        with open(name, 'wb') as f:
+            f.write(self.buffer)
+
+# fully bytearray version, but not support compression and page number
+# you can override _putpages to re-support compression and page number 
+class FPDF_fixed2(FPDF):
+    def __init__(self, orientation='P', unit='mm', format='A4'):
+        super().__init__(orientation=orientation, unit=unit, format=format)
+        self.buffer = bytearray()
+
+    def _out(self, s):
+        if not isinstance(s, bytes):
+            if not isinstance(s, str):
+                s = str(s)
+            s = s.encode('latin1')
+        if(self.state == 2):
+            self.pages[self.page] += s + b'\n'
+        else:
+            self.buffer += s + b'\n'
+
+    def output(self, name=''):
+        if(self.state < 3):
+            self.close()
+        with open(name, 'wb') as f:
+            f.write(self.buffer)
+
+    def _beginpage(self, orientation):
+        super()._beginpage(orientation)
+        self.pages[self.page] = bytearray()
+    
+    def set_compression(self, compress): # disable
+        return super().set_compression(False)
+    
+    def alias_nb_pages(self, alias): # disable
+        pass
